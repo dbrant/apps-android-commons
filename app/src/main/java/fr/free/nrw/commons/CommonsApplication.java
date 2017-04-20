@@ -18,6 +18,8 @@ import com.nostra13.universalimageloader.cache.disc.impl.TotalSizeLimitedDiscCac
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
 import com.nostra13.universalimageloader.utils.StorageUtils;
+import com.squareup.leakcanary.LeakCanary;
+import com.squareup.leakcanary.RefWatcher;
 
 import org.acra.ACRA;
 import org.acra.ReportingInteractionMode;
@@ -74,6 +76,8 @@ public class CommonsApplication extends Application {
 
     public CacheController cacheData;
 
+    private RefWatcher refWatcher;
+
     public static AbstractHttpClient createHttpClient() {
         BasicHttpParams params = new BasicHttpParams();
         SchemeRegistry schemeRegistry = new SchemeRegistry();
@@ -92,6 +96,7 @@ public class CommonsApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        refWatcher = LeakCanary.install(this);
 
         Timber.plant(new Timber.DebugTree());
 
