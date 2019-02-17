@@ -80,6 +80,10 @@ public class CommonsApplication extends Application {
 
     private RefWatcher refWatcher;
 
+    private static CommonsApplication INSTANCE;
+    public static CommonsApplication getInstance() {
+        return INSTANCE;
+    }
 
     /**
      * Used to declare and initialize various components and dependencies
@@ -87,6 +91,7 @@ public class CommonsApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        INSTANCE = this;
         ACRA.init(this);
         if (BuildConfig.DEBUG) {
             //FIXME: Traceur should be disabled for release builds until error fixed
@@ -168,6 +173,10 @@ public class CommonsApplication extends Application {
                 manager.createNotificationChannel(channel);
             }
         }
+    }
+
+    public String getUserAgent() {
+        return "Commons/" + ConfigUtils.getVersionNameWithSha(this) + " (https://mediawiki.org/wiki/Apps/Commons) Android/" + Build.VERSION.RELEASE;
     }
 
     /**

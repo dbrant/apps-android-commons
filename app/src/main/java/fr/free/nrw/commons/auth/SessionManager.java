@@ -6,6 +6,9 @@ import android.accounts.AccountManager;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+
+import org.wikipedia.login.LoginResult;
 
 import javax.annotation.Nullable;
 
@@ -40,14 +43,6 @@ public class SessionManager {
         this.defaultKvStore = defaultKvStore;
     }
 
-    /**
-     * Creata a new account
-     *
-     * @param response
-     * @param username
-     * @param rawusername
-     * @param password
-     */
     public void createAccount(@Nullable AccountAuthenticatorResponse response,
                               String username, String rawusername, String password) {
 
@@ -67,6 +62,33 @@ public class SessionManager {
                 response.onResult(bundle);
             }
 
+        } else {
+            if (response != null) {
+                response.onError(ERROR_CODE_REMOTE_EXCEPTION, "");
+            }
+            Timber.d("account creation failure");
+        }
+
+        // FIXME: If the user turns it off, it shouldn't be auto turned back on
+        ContentResolver.setSyncAutomatically(account, BuildConfig.CONTRIBUTION_AUTHORITY, true); // Enable sync by default!
+        ContentResolver.setSyncAutomatically(account, BuildConfig.MODIFICATION_AUTHORITY, true); // Enable sync by default!
+    }
+
+    public void createAccount(@Nullable AccountAuthenticatorResponse response, @NonNull LoginResult result) {
+        Account account = new Account(result.getUserName(), BuildConfig.ACCOUNT_TYPE);
+        boolean created = accountManager().addAccountExplicitly(account, result.getPassword(), userdata);
+
+        Timber.d("account creation " + (created ? "successful" : "failure"));
+
+        if (created) {
+            if (response != null) {
+                Bundle bundle = new Bundle();
+                bundle.putString(KEY_ACCOUNT_NAME, result.getUserName());
+                bundle.putString(KEY_ACCOUNT_TYPE, BuildConfig.ACCOUNT_TYPE);
+
+
+                response.onResult(bundle);
+            }
         } else {
             if (response != null) {
                 response.onError(ERROR_CODE_REMOTE_EXCEPTION, "");
