@@ -21,6 +21,7 @@ import com.tspoon.traceur.Traceur;
 import org.acra.ACRA;
 import org.acra.ReportingInteractionMode;
 import org.acra.annotation.ReportsCrashes;
+import org.wikipedia.AppAdapter;
 
 import java.io.File;
 
@@ -91,7 +92,10 @@ public class CommonsApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+
         INSTANCE = this;
+        AppAdapter.set(new CommonsApplicationAdapter());
+
         ACRA.init(this);
         if (BuildConfig.DEBUG) {
             //FIXME: Traceur should be disabled for release builds until error fixed
