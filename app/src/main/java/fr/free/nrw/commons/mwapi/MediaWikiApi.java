@@ -37,8 +37,6 @@ public interface MediaWikiApi {
 
     String findThumbnailByFilename(String filename) throws IOException;
 
-    boolean logEvents(LogBuilder[] logBuilders);
-
     List<Media> getCategoryImages(String categoryName);
 
     List<String> getSubCategoryList(String categoryName);
