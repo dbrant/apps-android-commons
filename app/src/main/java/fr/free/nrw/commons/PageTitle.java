@@ -1,6 +1,9 @@
 package fr.free.nrw.commons;
 
 import android.net.Uri;
+
+import org.apache.commons.lang3.StringUtils;
+
 import androidx.annotation.NonNull;
 
 public class PageTitle {
@@ -16,11 +19,13 @@ public class PageTitle {
 
         // Canonicalize and capitalize page title and namespace (if present)
         if (segments.length == 2) {
-            namespace = Utils.capitalize(segments[0]);
-            titleKey = Utils.capitalize(segments[1]);
+            // TODO: canonicalize and capitalize namespace as well
+            // see https://www.mediawiki.org/wiki/Manual:Title.php#Canonical_forms
+            namespace = segments[0];
+            titleKey = StringUtils.capitalize(segments[1]);
         } else {
             namespace = "";
-            titleKey = Utils.capitalize(segments[0]);
+            titleKey = StringUtils.capitalize(segments[0]);
         }
     }
 

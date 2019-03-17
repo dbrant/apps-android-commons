@@ -27,6 +27,8 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.io.IOException;
 import java.util.Locale;
 
@@ -214,7 +216,7 @@ public class LoginActivity extends AccountAuthenticatorActivity {
         loginCurrentlyInProgress = true;
         Timber.d("Login to start!");
         final String username = canonicializeUsername(usernameEdit.getText().toString());
-        final String rawUsername = Utils.capitalize(usernameEdit.getText().toString().trim());
+        final String rawUsername = StringUtils.capitalize(usernameEdit.getText().toString().trim());
         final String password = passwordEdit.getText().toString();
         String twoFactorCode = twoFactorEdit.getText().toString();
 
