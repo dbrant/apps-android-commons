@@ -1,5 +1,7 @@
 package fr.free.nrw.commons.utils;
 
+import java.util.concurrent.Callable;
+
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
@@ -16,7 +18,7 @@ public class ImageUtilsWrapper {
     }
 
     public Single<Integer> checkImageBitmapIssues(String bitmapPath) {
-        return Single.just(ImageUtils.checkImageBitmapIssues(bitmapPath))
+        return Single.fromCallable(() -> ImageUtils.checkImageBitmapIssues(bitmapPath))
                 .subscribeOn(Schedulers.computation())
                 .observeOn(Schedulers.computation());
     }

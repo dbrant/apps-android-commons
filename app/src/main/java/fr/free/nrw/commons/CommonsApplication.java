@@ -1,7 +1,6 @@
 package fr.free.nrw.commons;
 
 import android.annotation.SuppressLint;
-import android.app.Application;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
@@ -30,6 +29,8 @@ import javax.inject.Inject;
 import javax.inject.Named;
 
 import androidx.annotation.NonNull;
+import androidx.multidex.MultiDexApplication;
+
 import fr.free.nrw.commons.auth.SessionManager;
 import fr.free.nrw.commons.bookmarks.locations.BookmarkLocationsDao;
 import fr.free.nrw.commons.bookmarks.pictures.BookmarkPicturesDao;
@@ -77,7 +78,7 @@ import static org.acra.ReportField.USER_COMMENT;
         resCommentPrompt = R.string.crash_dialog_comment_prompt
 )
 
-public class CommonsApplication extends Application {
+public class CommonsApplication extends MultiDexApplication {
     @Inject SessionManager sessionManager;
     @Inject DBOpenHelper dbOpenHelper;
 

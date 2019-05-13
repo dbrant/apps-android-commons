@@ -6,13 +6,14 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
-import android.graphics.PointF;
 import android.graphics.Rect;
-import android.media.FaceDetector;
+import android.graphics.RectF;
 import android.net.Uri;
 
 import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.facebook.common.executors.CallerThreadExecutor;
@@ -24,10 +25,18 @@ import com.facebook.imagepipeline.datasource.BaseBitmapDataSubscriber;
 import com.facebook.imagepipeline.image.CloseableImage;
 import com.facebook.imagepipeline.request.ImageRequest;
 import com.facebook.imagepipeline.request.ImageRequestBuilder;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.ml.vision.FirebaseVision;
+import com.google.firebase.ml.vision.common.FirebaseVisionImage;
+import com.google.firebase.ml.vision.face.FirebaseVisionFace;
+import com.google.firebase.ml.vision.face.FirebaseVisionFaceDetector;
+import com.google.firebase.ml.vision.face.FirebaseVisionFaceDetectorOptions;
 
 import java.io.IOException;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.List;
 
 import androidx.exifinterface.media.ExifInterface;
 
@@ -79,6 +88,8 @@ public class ImageUtils {
     public static final int FILE_NAME_EXISTS = -4;
     static final int NO_CATEGORY_SELECTED = -5;
 
+    private static final int TEST_BITMAP_SIZE = 384;
+
     @IntDef(
             flag = true,
             value = {
@@ -118,16 +129,20 @@ public class ImageUtils {
     static @Result int checkImageBitmapIssues(String imagePath) {
         long millis = System.currentTimeMillis();
         try {
-            Bitmap bmp = new ExifInterface(imagePath).getThumbnailBitmap();
+            ExifInterface exif = new ExifInterface(imagePath);
+
+            Bitmap bmp = exif.getThumbnailBitmap();
             if (bmp == null) {
                 bmp = BitmapFactory.decodeFile(imagePath);
             }
+
+            int rotationDegrees = exif.getRotationDegrees();
 
             if (checkIfImageIsDark(bmp)) {
                 return IMAGE_DARK;
             }
 
-            if (checkIfImageIsSelfie(bmp)) {
+            if (checkIfImageIsSelfie(bmp, rotationDegrees)) {
                 return IMAGE_SELFIE;
             }
 
@@ -208,49 +223,71 @@ public class ImageUtils {
         return true;
     }
 
-    private static boolean checkIfImageIsSelfie(Bitmap bitmap) {
-        // create a new 5-6-5 bitmap, since this is required for the face detector.
-        final int testSize = 384;
-        Bitmap testBmp = Bitmap.createBitmap(testSize,
-                (bitmap.getHeight() * testSize) / bitmap.getWidth(), Bitmap.Config.RGB_565);
-        Canvas canvas = new Canvas(testBmp);
-        Rect srcRect = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
-        Rect destRect = new Rect(0, 0, testSize, testBmp.getHeight());
-        Paint paint = new Paint();
-        paint.setColor(Color.BLACK);
-        canvas.drawBitmap(bitmap, srcRect, destRect, paint);
+    private static boolean checkIfImageIsSelfie(@NonNull Bitmap srcBitmap, int rotationDegrees) throws Exception {
+        Bitmap bitmap = Bitmap.createBitmap(TEST_BITMAP_SIZE,
+                (srcBitmap.getHeight() * TEST_BITMAP_SIZE) / srcBitmap.getWidth(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Rect srcRect = new Rect(0, 0, srcBitmap.getWidth(), srcBitmap.getHeight());
+        Rect destRect = new Rect(0, 0, TEST_BITMAP_SIZE, bitmap.getHeight());
+        canvas.drawBitmap(srcBitmap, srcRect, destRect, new Paint());
 
-        // initialize the face detector, and look for only the largest face...
-        final int maxFaces = 4;
-        FaceDetector fd = new FaceDetector(testBmp.getWidth(), testBmp.getHeight(), maxFaces);
-        FaceDetector.Face[] faces = new FaceDetector.Face[maxFaces];
-        int numFound = fd.findFaces(testBmp, faces);
-        FaceDetector.Face largestFace = null;
+        bitmap = rotateBitmap(bitmap, rotationDegrees).copy(Bitmap.Config.ARGB_8888, true);
+        canvas = new Canvas(bitmap);
 
-        for (int i = 0; i < numFound; i++) {
-            if (largestFace == null || largestFace.eyesDistance() < faces[i].eyesDistance()) {
-                largestFace = faces[i];
+        FirebaseVisionFaceDetectorOptions highAccuracyOpts = new FirebaseVisionFaceDetectorOptions.Builder()
+                .setPerformanceMode(FirebaseVisionFaceDetectorOptions.ACCURATE)
+                .setContourMode(FirebaseVisionFaceDetectorOptions.NO_CONTOURS)
+                .setLandmarkMode(FirebaseVisionFaceDetectorOptions.NO_LANDMARKS)
+                .build();
+
+        FirebaseVisionFaceDetector faceDetector = FirebaseVision.getInstance()
+                .getVisionFaceDetector();
+
+        FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(bitmap);
+
+        Task<List<FirebaseVisionFace>> result = faceDetector.detectInImage(image)
+                .addOnFailureListener(e -> {
+                    Timber.e("Face detection failed.");
+                    e.printStackTrace();
+                });
+
+        Tasks.await(result);
+        List<FirebaseVisionFace> faces = result.getResult();
+
+        if (faces == null || faces.isEmpty()) {
+            return false;
+        }
+
+        FirebaseVisionFace largestFace = null;
+
+        for (FirebaseVisionFace face : faces) {
+            if (largestFace == null || largestFace.getBoundingBox().width() < face.getBoundingBox().width()) {
+                largestFace = face;
             }
         }
 
-        if (largestFace != null) {
-            PointF facePos = new PointF();
-            largestFace.getMidPoint(facePos);
-            // center on the nose, not on the eyes
-            facePos.y += largestFace.eyesDistance() / 2;
+        Paint linePaint = new Paint();
+        linePaint.setColor(Color.GREEN);
+        linePaint.setStrokeWidth(4);
+        linePaint.setStyle(Paint.Style.STROKE);
 
-            Paint linePaint = new Paint();
-            linePaint.setStrokeWidth(4f);
-            linePaint.setColor(Color.GREEN);
-            canvas.drawLine(facePos.x - largestFace.eyesDistance(), facePos.y - largestFace.eyesDistance(), facePos.x + largestFace.eyesDistance(), facePos.y - largestFace.eyesDistance(), linePaint);
-            canvas.drawLine(facePos.x - largestFace.eyesDistance(), facePos.y + largestFace.eyesDistance(), facePos.x + largestFace.eyesDistance(), facePos.y + largestFace.eyesDistance(), linePaint);
-            canvas.drawLine(facePos.x - largestFace.eyesDistance(), facePos.y - largestFace.eyesDistance(), facePos.x - largestFace.eyesDistance(), facePos.y + largestFace.eyesDistance(), linePaint);
-            canvas.drawLine(facePos.x + largestFace.eyesDistance(), facePos.y - largestFace.eyesDistance(), facePos.x + largestFace.eyesDistance(), facePos.y + largestFace.eyesDistance(), linePaint);
+        //canvas.drawLine(0, 0, 100, 100, linePaint);
 
-            setPreviewBitmap(testBmp);
-            return true;
-        }
-        return false;
+        //canvas.drawLine(largestFace.getBoundingBox().left, largestFace.getBoundingBox().top, largestFace.getBoundingBox().right, largestFace.getBoundingBox().top, linePaint);
+
+        canvas.drawRoundRect(new RectF(largestFace.getBoundingBox().left, largestFace.getBoundingBox().top, largestFace.getBoundingBox().right, largestFace.getBoundingBox().bottom),
+                4, 4, linePaint);
+
+        setPreviewBitmap(bitmap);
+        return true;
+    }
+
+    private static Bitmap rotateBitmap(Bitmap bitmap, int rotationDegrees) {
+        Matrix matrix = new Matrix();
+        matrix.postRotate(rotationDegrees);
+        // Mirror the image along X axis for front-facing camera image.
+        //matrix.postScale(-1.0f, 1.0f);
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
     }
 
     /**
