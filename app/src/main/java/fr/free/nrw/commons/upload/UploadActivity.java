@@ -13,9 +13,6 @@ import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import android.text.TextUtils;
-import android.text.method.LinkMovementMethod;
-import android.text.style.ClickableSpan;
-import android.text.style.URLSpan;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
@@ -64,6 +61,7 @@ import fr.free.nrw.commons.nearby.Place;
 import fr.free.nrw.commons.theme.BaseActivity;
 import fr.free.nrw.commons.ui.widget.HtmlTextView;
 import fr.free.nrw.commons.utils.DialogUtil;
+import fr.free.nrw.commons.utils.ImageUtils;
 import fr.free.nrw.commons.utils.NetworkUtils;
 import fr.free.nrw.commons.utils.PermissionUtils;
 import fr.free.nrw.commons.utils.ViewUtil;
@@ -387,6 +385,20 @@ public class UploadActivity extends BaseActivity implements UploadView, SimilarI
                 errorMessage,
                 () -> presenter.deletePicture(),
                 () -> presenter.keepPicture());
+    }
+
+    @Override
+    public void showSelfieWarningPopup() {
+        View view = getLayoutInflater().inflate(R.layout.dialog_message_with_image, null);
+        ImageView imageView = view.findViewById(R.id.dialog_image);
+        TextView textView = view.findViewById(R.id.dialog_text);
+        imageView.setImageBitmap(ImageUtils.getPreviewBitmap());
+        textView.setText(R.string.upload_image_selfie);
+        new AlertDialog.Builder(this)
+                .setView(view)
+                .setPositiveButton(R.string.yes, (dialog, which) -> presenter.keepPicture())
+                .setNegativeButton(R.string.no, (dialog, which) -> presenter.deletePicture())
+                .show();
     }
 
     @Override

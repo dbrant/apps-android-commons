@@ -13,18 +13,10 @@ import fr.free.nrw.commons.location.LatLng;
 import fr.free.nrw.commons.nearby.Place;
 import fr.free.nrw.commons.settings.Prefs;
 import fr.free.nrw.commons.utils.CustomProxy;
-import fr.free.nrw.commons.utils.CustomProxy;
-import fr.free.nrw.commons.utils.StringSortingUtils;
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
-import java.util.ArrayList;
-import java.util.List;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
-import org.apache.commons.lang3.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 import javax.inject.Inject;
@@ -37,6 +29,7 @@ import static fr.free.nrw.commons.utils.ImageUtils.EMPTY_TITLE;
 import static fr.free.nrw.commons.utils.ImageUtils.FILE_NAME_EXISTS;
 import static fr.free.nrw.commons.utils.ImageUtils.IMAGE_KEEP;
 import static fr.free.nrw.commons.utils.ImageUtils.IMAGE_OK;
+import static fr.free.nrw.commons.utils.ImageUtils.IMAGE_SELFIE;
 import static fr.free.nrw.commons.utils.ImageUtils.getErrorMessageForResult;
 
 /**
@@ -173,6 +166,10 @@ public class UploadPresenter {
             case FILE_NAME_EXISTS:
                 Timber.d("Trying to show duplicate picture popup");
                 view.showDuplicatePicturePopup();
+                break;
+            case IMAGE_SELFIE:
+                Timber.d("Probable selfie detected...");
+                view.showSelfieWarningPopup();
                 break;
             default:
                 String errorMessageForResult = getErrorMessageForResult(context, errorCode);

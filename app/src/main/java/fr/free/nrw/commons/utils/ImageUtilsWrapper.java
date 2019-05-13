@@ -15,8 +15,8 @@ public class ImageUtilsWrapper {
 
     }
 
-    public Single<Integer> checkIfImageIsTooDark(String bitmapPath) {
-        return Single.just(ImageUtils.checkIfImageIsTooDark(bitmapPath))
+    public Single<Integer> checkImageBitmapIssues(String bitmapPath) {
+        return Single.just(ImageUtils.checkImageBitmapIssues(bitmapPath))
                 .subscribeOn(Schedulers.computation())
                 .observeOn(Schedulers.computation());
     }

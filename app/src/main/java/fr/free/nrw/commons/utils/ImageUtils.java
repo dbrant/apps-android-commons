@@ -4,7 +4,12 @@ import android.app.WallpaperManager;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.PointF;
+import android.graphics.Rect;
+import android.media.FaceDetector;
 import android.net.Uri;
 
 import androidx.annotation.IntDef;
@@ -25,6 +30,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 import androidx.exifinterface.media.ExifInterface;
+
 import fr.free.nrw.commons.R;
 import fr.free.nrw.commons.location.LatLng;
 import timber.log.Timber;
@@ -61,6 +67,11 @@ public class ImageUtils {
     * ie. 100000
     */
     public static final int FILE_NO_EXIF = 1 << 5;
+    /**
+     * The image is likely a selfie (face detected within a certain threshold).
+     */
+    public static final int IMAGE_SELFIE = 1 << 6;
+
     public static final int IMAGE_OK = 0;
     public static final int IMAGE_KEEP = -1;
     public static final int IMAGE_WAIT = -2;
@@ -73,6 +84,7 @@ public class ImageUtils {
             value = {
                     IMAGE_DARK,
                     IMAGE_BLURRY,
+                    IMAGE_SELFIE,
                     IMAGE_DUPLICATE,
                     IMAGE_OK,
                     IMAGE_KEEP,
@@ -87,11 +99,23 @@ public class ImageUtils {
     public @interface Result {
     }
 
+
+    private static Bitmap PREVIEW_BITMAP;
+    public static synchronized void setPreviewBitmap(@Nullable Bitmap bitmap) {
+        if (PREVIEW_BITMAP != null && !PREVIEW_BITMAP.isRecycled()) {
+            PREVIEW_BITMAP.recycle();
+        }
+        PREVIEW_BITMAP = bitmap;
+    }
+    public static synchronized Bitmap getPreviewBitmap() {
+        return PREVIEW_BITMAP;
+    }
+
     /**
-     * @return IMAGE_OK if image is not too dark
+     * @return IMAGE_OK if the image has no issues
      * IMAGE_DARK if image is too dark
      */
-    static @Result int checkIfImageIsTooDark(String imagePath) {
+    static @Result int checkImageBitmapIssues(String imagePath) {
         long millis = System.currentTimeMillis();
         try {
             Bitmap bmp = new ExifInterface(imagePath).getThumbnailBitmap();
@@ -101,6 +125,10 @@ public class ImageUtils {
 
             if (checkIfImageIsDark(bmp)) {
                 return IMAGE_DARK;
+            }
+
+            if (checkIfImageIsSelfie(bmp)) {
+                return IMAGE_SELFIE;
             }
 
         } catch (Exception e) {
@@ -178,6 +206,51 @@ public class ImageUtils {
             }
         }
         return true;
+    }
+
+    private static boolean checkIfImageIsSelfie(Bitmap bitmap) {
+        // create a new 5-6-5 bitmap, since this is required for the face detector.
+        final int testSize = 384;
+        Bitmap testBmp = Bitmap.createBitmap(testSize,
+                (bitmap.getHeight() * testSize) / bitmap.getWidth(), Bitmap.Config.RGB_565);
+        Canvas canvas = new Canvas(testBmp);
+        Rect srcRect = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
+        Rect destRect = new Rect(0, 0, testSize, testBmp.getHeight());
+        Paint paint = new Paint();
+        paint.setColor(Color.BLACK);
+        canvas.drawBitmap(bitmap, srcRect, destRect, paint);
+
+        // initialize the face detector, and look for only the largest face...
+        final int maxFaces = 4;
+        FaceDetector fd = new FaceDetector(testBmp.getWidth(), testBmp.getHeight(), maxFaces);
+        FaceDetector.Face[] faces = new FaceDetector.Face[maxFaces];
+        int numFound = fd.findFaces(testBmp, faces);
+        FaceDetector.Face largestFace = null;
+
+        for (int i = 0; i < numFound; i++) {
+            if (largestFace == null || largestFace.eyesDistance() < faces[i].eyesDistance()) {
+                largestFace = faces[i];
+            }
+        }
+
+        if (largestFace != null) {
+            PointF facePos = new PointF();
+            largestFace.getMidPoint(facePos);
+            // center on the nose, not on the eyes
+            facePos.y += largestFace.eyesDistance() / 2;
+
+            Paint linePaint = new Paint();
+            linePaint.setStrokeWidth(4f);
+            linePaint.setColor(Color.GREEN);
+            canvas.drawLine(facePos.x - largestFace.eyesDistance(), facePos.y - largestFace.eyesDistance(), facePos.x + largestFace.eyesDistance(), facePos.y - largestFace.eyesDistance(), linePaint);
+            canvas.drawLine(facePos.x - largestFace.eyesDistance(), facePos.y + largestFace.eyesDistance(), facePos.x + largestFace.eyesDistance(), facePos.y + largestFace.eyesDistance(), linePaint);
+            canvas.drawLine(facePos.x - largestFace.eyesDistance(), facePos.y - largestFace.eyesDistance(), facePos.x - largestFace.eyesDistance(), facePos.y + largestFace.eyesDistance(), linePaint);
+            canvas.drawLine(facePos.x + largestFace.eyesDistance(), facePos.y - largestFace.eyesDistance(), facePos.x + largestFace.eyesDistance(), facePos.y + largestFace.eyesDistance(), linePaint);
+
+            setPreviewBitmap(testBmp);
+            return true;
+        }
+        return false;
     }
 
     /**

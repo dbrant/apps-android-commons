@@ -69,6 +69,8 @@ public interface UploadView {
 
     void showDuplicatePicturePopup();
 
+    void showSelfieWarningPopup();
+
     void finish();
 
     void launchMapActivity(LatLng decCoords);

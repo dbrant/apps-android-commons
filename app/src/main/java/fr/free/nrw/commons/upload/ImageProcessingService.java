@@ -1,6 +1,7 @@
 package fr.free.nrw.commons.upload;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.net.Uri;
 
 import org.apache.commons.lang3.StringUtils;
@@ -67,15 +68,15 @@ public class ImageProcessingService {
         Uri contentUri=uploadItem.getContentUri();
         Single<Integer> duplicateImage = checkDuplicateImage(filePath);
         Single<Integer> wrongGeoLocation = checkImageGeoLocation(uploadItem.getPlace(), filePath);
-        Single<Integer> darkImage = checkDarkImage(filePath);
+        Single<Integer> bitmapIssues = checkImageBitmapIssues(filePath);
         Single<Integer> itemTitle = checkTitle ? validateItemTitle(uploadItem) : Single.just(ImageUtils.IMAGE_OK);
         Single<Integer> checkFBMD = checkFBMD(context,contentUri);
         Single<Integer> checkEXIF = checkEXIF(filePath);
 
-        Single<Integer> zipResult = Single.zip(duplicateImage, wrongGeoLocation, darkImage, itemTitle,
-                (duplicate, wrongGeo, dark, title) -> {
-                    Timber.d("Result for duplicate: %d, geo: %d, dark: %d, title: %d", duplicate, wrongGeo, dark, title);
-                    return duplicate | wrongGeo | dark | title;
+        Single<Integer> zipResult = Single.zip(duplicateImage, wrongGeoLocation, bitmapIssues, itemTitle,
+                (duplicate, wrongGeo, bmpIssues, title) -> {
+                    Timber.d("Result for duplicate: %d, geo: %d, dark: %d, title: %d", duplicate, wrongGeo, bmpIssues, title);
+                    return duplicate | wrongGeo | bmpIssues | title;
                 });
         return Single.zip(zipResult, checkFBMD , checkEXIF , (zip , fbmd , exif)->{
             Timber.d("zip:" + zip + "fbmd:" + fbmd + "exif:" + exif);
@@ -157,11 +158,11 @@ public class ImageProcessingService {
      * Checks for dark image
      *
      * @param filePath file to be checked
-     * @return IMAGE_DARK or IMAGE_OK
+     * @return IMAGE_OK if no issues, or other flags set if there were issues found.
      */
-    private Single<Integer> checkDarkImage(String filePath) {
+    private Single<Integer> checkImageBitmapIssues(String filePath) {
         Timber.d("Checking for dark image %s", filePath);
-        return imageUtilsWrapper.checkIfImageIsTooDark(filePath);
+        return imageUtilsWrapper.checkImageBitmapIssues(filePath);
     }
 
     /**
