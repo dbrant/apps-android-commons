@@ -25,6 +25,7 @@ import com.facebook.imagepipeline.datasource.BaseBitmapDataSubscriber;
 import com.facebook.imagepipeline.image.CloseableImage;
 import com.facebook.imagepipeline.request.ImageRequest;
 import com.facebook.imagepipeline.request.ImageRequestBuilder;
+import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.ml.vision.FirebaseVision;
@@ -32,6 +33,8 @@ import com.google.firebase.ml.vision.common.FirebaseVisionImage;
 import com.google.firebase.ml.vision.face.FirebaseVisionFace;
 import com.google.firebase.ml.vision.face.FirebaseVisionFaceDetector;
 import com.google.firebase.ml.vision.face.FirebaseVisionFaceDetectorOptions;
+import com.google.firebase.ml.vision.label.FirebaseVisionImageLabel;
+import com.google.firebase.ml.vision.label.FirebaseVisionImageLabeler;
 
 import java.io.IOException;
 import java.lang.annotation.Retention;
@@ -243,6 +246,14 @@ public class ImageUtils {
 
         canvas = new Canvas(finalBitmap);
 
+        /*
+        To make FireBase ML Kit face detection work:
+        - Log on to your FireBase account, create a "project" and add the app to the project.
+        - This will generate a "google-services.json" file which you should place in the /app/ folder.
+
+        https://firebase.google.com/docs/ml-kit/android/detect-faces
+        */
+
         FirebaseVisionFaceDetectorOptions highAccuracyOpts = new FirebaseVisionFaceDetectorOptions.Builder()
                 .setPerformanceMode(FirebaseVisionFaceDetectorOptions.ACCURATE)
                 .setContourMode(FirebaseVisionFaceDetectorOptions.NO_CONTOURS)
@@ -262,6 +273,28 @@ public class ImageUtils {
 
         Tasks.await(result);
         List<FirebaseVisionFace> faces = result.getResult();
+
+
+
+        // TODO: expose and use these labels somewhere:
+
+        FirebaseVisionImageLabeler labeler = FirebaseVision.getInstance()
+                .getOnDeviceImageLabeler();
+
+        Task<List<FirebaseVisionImageLabel>> labelTask = labeler.processImage(image)
+                .addOnFailureListener(e -> {
+                    Timber.e("Image labeling failed.");
+                    e.printStackTrace();
+                });
+
+        Tasks.await(labelTask);
+
+        List<FirebaseVisionImageLabel> labels = labelTask.getResult();
+        for (FirebaseVisionImageLabel label : labels) {
+            Timber.d(">>>>> " + label.getText());
+        }
+
+
 
         if (faces == null || faces.isEmpty()) {
             return false;

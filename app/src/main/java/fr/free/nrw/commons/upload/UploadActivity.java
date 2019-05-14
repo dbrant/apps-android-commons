@@ -396,8 +396,8 @@ public class UploadActivity extends BaseActivity implements UploadView, SimilarI
         textView.setText(R.string.upload_image_selfie);
         new AlertDialog.Builder(this)
                 .setView(view)
-                .setPositiveButton(R.string.yes, (dialog, which) -> presenter.keepPicture())
-                .setNegativeButton(R.string.no, (dialog, which) -> presenter.deletePicture())
+                .setPositiveButton(R.string.continue_message, (dialog, which) -> presenter.keepPicture())
+                .setNegativeButton(R.string.cancel, (dialog, which) -> presenter.deletePicture())
                 .show();
     }
 
