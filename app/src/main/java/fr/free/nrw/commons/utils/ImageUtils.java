@@ -128,10 +128,11 @@ public class ImageUtils {
      */
     static @Result int checkImageBitmapIssues(String imagePath) {
         long millis = System.currentTimeMillis();
+        Bitmap bmp = null;
         try {
             ExifInterface exif = new ExifInterface(imagePath);
 
-            Bitmap bmp = exif.getThumbnailBitmap();
+            bmp = exif.getThumbnailBitmap();
             if (bmp == null) {
                 bmp = BitmapFactory.decodeFile(imagePath);
             }
@@ -150,6 +151,9 @@ public class ImageUtils {
             Timber.d(e, "Error while checking image darkness.");
         } finally {
             Timber.d("Checking image darkness took " + (System.currentTimeMillis() - millis) + " ms.");
+            if (bmp != null && !bmp.isRecycled()) {
+                bmp.recycle();
+            }
         }
         return IMAGE_OK;
     }
@@ -224,15 +228,20 @@ public class ImageUtils {
     }
 
     private static boolean checkIfImageIsSelfie(@NonNull Bitmap srcBitmap, int rotationDegrees) throws Exception {
-        Bitmap bitmap = Bitmap.createBitmap(TEST_BITMAP_SIZE,
+        Bitmap scaledBitmap = Bitmap.createBitmap(TEST_BITMAP_SIZE,
                 (srcBitmap.getHeight() * TEST_BITMAP_SIZE) / srcBitmap.getWidth(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
+        Canvas canvas = new Canvas(scaledBitmap);
         Rect srcRect = new Rect(0, 0, srcBitmap.getWidth(), srcBitmap.getHeight());
-        Rect destRect = new Rect(0, 0, TEST_BITMAP_SIZE, bitmap.getHeight());
+        Rect destRect = new Rect(0, 0, TEST_BITMAP_SIZE, scaledBitmap.getHeight());
         canvas.drawBitmap(srcBitmap, srcRect, destRect, new Paint());
 
-        bitmap = rotateBitmap(bitmap, rotationDegrees).copy(Bitmap.Config.ARGB_8888, true);
-        canvas = new Canvas(bitmap);
+        Bitmap rotatedBitmap = rotateBitmap(scaledBitmap, rotationDegrees);
+        scaledBitmap.recycle();
+
+        Bitmap finalBitmap = rotatedBitmap.copy(Bitmap.Config.ARGB_8888, true);
+        rotatedBitmap.recycle();
+
+        canvas = new Canvas(finalBitmap);
 
         FirebaseVisionFaceDetectorOptions highAccuracyOpts = new FirebaseVisionFaceDetectorOptions.Builder()
                 .setPerformanceMode(FirebaseVisionFaceDetectorOptions.ACCURATE)
@@ -243,7 +252,7 @@ public class ImageUtils {
         FirebaseVisionFaceDetector faceDetector = FirebaseVision.getInstance()
                 .getVisionFaceDetector();
 
-        FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(bitmap);
+        FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(finalBitmap);
 
         Task<List<FirebaseVisionFace>> result = faceDetector.detectInImage(image)
                 .addOnFailureListener(e -> {
@@ -271,14 +280,10 @@ public class ImageUtils {
         linePaint.setStrokeWidth(4);
         linePaint.setStyle(Paint.Style.STROKE);
 
-        //canvas.drawLine(0, 0, 100, 100, linePaint);
-
-        //canvas.drawLine(largestFace.getBoundingBox().left, largestFace.getBoundingBox().top, largestFace.getBoundingBox().right, largestFace.getBoundingBox().top, linePaint);
-
         canvas.drawRoundRect(new RectF(largestFace.getBoundingBox().left, largestFace.getBoundingBox().top, largestFace.getBoundingBox().right, largestFace.getBoundingBox().bottom),
                 4, 4, linePaint);
 
-        setPreviewBitmap(bitmap);
+        setPreviewBitmap(finalBitmap);
         return true;
     }
 
